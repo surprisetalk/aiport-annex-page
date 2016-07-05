@@ -1,0 +1,27 @@
+{
+  "name": "aiport-annex-page",
+  "version": "0.0.1",
+  "main": "page.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/surprisetalk/aiport-annex-page.git"
+  },
+  "keywords": [
+    "aiport",
+    "annex",
+    "page"
+  ],
+  "author": "taylor sarrafian",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/surprisetalk/aiport-annex-page/issues"
+  },
+  "homepage": "https://github.com/surprisetalk/aiport-annex-page#readme",
+  "description": "",
+  "dependencies": {
+    "aiport-pile-page": "0.0.1"
+  }
+}
