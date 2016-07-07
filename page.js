@@ -1,11 +1,11 @@
 
 var annex = require('../aiport-dev/dev.js').annex;
-// TODO: aiport-scaffold, aiport-scrap, aiport-plugin
-// var page = require('../aiport-scaffold/scaffold.js').annex;
+var page = require('../aiport-pile-page/page.js');
+var scraps = require('../aiport-scrap/scraps.js');
 
 var pages = annex( 
-    __dirname + "/annexes.jade",
-    query => Promise.resolve({ annexes: page.installed().annex }) );
+    __dirname + "/pages.jade",
+    query => page.fetch().then( p => ({ pages: p, scraps: scraps }) ) );
 
 module.exports = pages;
 
