@@ -1,10 +1,6 @@
 
-h1 pages
-aside
-  //- form(action="/pile/page/new", method="post")
-  //-   input(type="submit")
-  //- ul
-  //-   each page in pages
-  //-     li= page
-main
-  p= "elm goes here"
+div(id="annex-page",style="height:100%;")
+script(src="/!/admin/annex/page/public/annex-page.js")
+script(type="text/javascript").
+  var node = document.getElementById('annex-page');
+  var app = Elm.Main.embed(node);
