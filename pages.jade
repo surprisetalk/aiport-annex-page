@@ -2,5 +2,6 @@
 div(id="annex-page",style="height:100%;")
 script(src="/!/admin/annex/page/public/annex-page.js")
 script(type="text/javascript").
+  document.port = 9097;
   var node = document.getElementById('annex-page');
   var app = Elm.Main.embed(node);

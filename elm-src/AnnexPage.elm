@@ -3,13 +3,24 @@
 -- TODO: split this up into different files under src
 -- TODO: look at elm-markdown for how to parse html into the virtual-dom
 
+port module Main exposing (..)
+    
 import Html exposing (..)
 import Html.App as Html
 import Html.Events exposing (..)
 import Html.Attributes exposing (..)
+import JsonToHtml
+import JsonToPage 
 import String
-import Random
+import Task
+import Http
+            
+import Pagelet exposing (..)
+import Scrap exposing (..)
+import Page exposing (..)
+import Tree exposing (..)
 
+main : Program Never
 main =
   Html.program
     { init = init
@@ -21,6 +32,7 @@ main =
 
 -- HELPERS
 
+(=>) : a -> b -> ( a, b )
 (=>) = (,)
 
 (?) : Maybe a -> a -> a
@@ -28,119 +40,40 @@ main =
   Maybe.withDefault default maybe
 
 
--- TREE
-
-type Tree a = Node a (List (Tree a))
-      
-sprout : a -> Tree a
-sprout v = 
-    Node v []
-
-pick : Tree a -> a
-pick tree = 
-    let 
-        (Node v _) = tree
-    in 
-        v
-            
 -- MODEL
 
 -- TODO: remove page and pagelet in favor of .active
 -- TODO: page and pagelet are copies, which means we have to sync in a few places...
+-- TODO: OR pagelets will have IDs, which means we can subscribe to the db :3
 type alias Model =
-    { pages : List Page
-    , scraps : List Scrap
-    , page : Page
-    , pagelet : Pagelet
+    { pages : List (Page Msg)
+    , scraps : List (Scrap Msg)
+    , page : Page Msg
+    , pagelet : Pagelet Msg
+    , workspace : Html Msg
     }
     
-type alias Page =
-    { name : String
-    , route : String
-    , pagelets : List Pagelet
-    }
-    
-type alias PageletNode =
-    { scrap : Scrap
-    -- , stuff : List Pagelet
-    }
-    
-type alias Pagelet = Tree PageletNode
-    
-setScrap : Pagelet -> Scrap -> Pagelet
-setScrap pagelet scrap =
-    let
-        (Node v n) = pagelet
-    in
-        Node { v | scrap = scrap } n
-    
--- TODO: scrap.html really contains a route to the scrap, which accepts html/arguments and returns html
--- TODO: pass it a "blank" scrap for it to render in the empty spot
--- TODO: holes may not be visible in the viewer, so users should add subscraps in the scrap detail area
-type alias Scrap =
-    { name : String
-    , html : Html Msg
-    -- TODO: dictionary of options, like color, etc
-    }
-
-emptyScrap : Scrap
-emptyScrap =
-    { name = ""
-    , html = div [] []
-    }
-    
-testScraps : List Scrap
-testScraps =
-    [ { name = "header", html = header [] [ h1 [] [ text "TAYSAR" ] ] }
-    , { name = "body", html = article [] [ section [] [ p [] [ text "lorem ipsum" ] ] ] }
-    , { name = "footer", html = footer [] [] }
-    ]
-    
-emptyPage : Page
-emptyPage =
-    { name = ""
-    , route = ""
-    , pagelets = []
-    }
-    
-emptyPagelet : Pagelet
-emptyPagelet 
-    = sprout 
-        { scrap = emptyScrap
-        -- , stuff = []
-        } 
-
-testPagelet : Pagelet
-testPagelet 
-    = sprout 
-        { scrap = (List.head testScraps) ? emptyScrap
-        -- , stuff = []
-        } 
-    
-testPages : List Page
-testPages =
-    [ { name = "home", route = "/", pagelets = [ testPagelet ] }
-    , { name = "about", route = "/about", pagelets = [] }
-    , { name = "contact", route = "/contact", pagelets = [] }
-    ]
-
 init : (Model, Cmd Msg)
 init =
   ( { pages = testPages
     , page = (List.head testPages) ? emptyPage 
     , pagelet = emptyPagelet
     , scraps = testScraps
+    , workspace = div [ styleColumn 50 "white" ] []
     }
-  , Cmd.none
+  , fetchPages
   )
 
 
 -- UPDATE
 
 type Msg
-  = ViewPage Page
-  | SelectPagelet Pagelet
-  | SelectScrap Scrap
+  = ViewPage (Page Msg)
+  | SelectPagelet (Pagelet Msg)
+  | SelectScrap (Scrap Msg)
+  | FetchPageSucceed (List (Page Msg))
+  | FetchScrapSucceed (List (Html Msg))
+  | FetchFail Http.Error
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -151,6 +84,22 @@ update msg model =
       ({ model | pagelet = pagelet }, Cmd.none)
     SelectScrap scrap ->
       ({ model | pagelet = setScrap model.pagelet scrap }, Cmd.none)
+    -- KLUDGE: shouldn't be chaining the commands like this
+    FetchPageSucceed pages ->
+      ({ model | pages = pages }, Debug.log "FetchPageSucceed" fetchScraps)
+    FetchScrapSucceed htmls ->
+      ({ model | workspace = div [ styleColumn 50 "white" ] htmls }, Debug.log "FetchScrapSucceed" Cmd.none)
+    FetchFail error ->
+      case error of
+          Http.Timeout ->
+              (model, Debug.log "timeout" Cmd.none)
+          Http.NetworkError ->
+              (model, Debug.log "network error" Cmd.none)
+          Http.UnexpectedPayload stuff ->
+              (model, Debug.log stuff Cmd.none)
+          Http.BadResponse code stuff ->
+              (model, Debug.log (stuff ++ toString code) Cmd.none)
+              
 
 
 -- SUBSCRIPTIONS
@@ -162,6 +111,7 @@ subscriptions model =
 
 -- VIEW
 
+styleColumn : a -> String -> Attribute b
 styleColumn width color = 
   style 
     [ "float" => "left"
@@ -177,22 +127,23 @@ view model =
   div [ style [ "height" => "100%" ] ] 
     [ pageNav model.pages
     , pageDetails model.page
-    , pageBuild model.pagelet model.page.pagelets
+    -- , pageBuild model.pagelet model.page.pagelets
+    , model.workspace
     , pageletDetails model.pagelet model.scraps 
     ]
       
-pageNav : List Page -> Html Msg
+pageNav : List (Page Msg) -> Html Msg
 pageNav pages =
   aside [ styleColumn 15 "#E8E8E8" ]
     [ ul []
         (List.map pageLink pages)
     ]
       
-pageLink : Page -> Html Msg
+pageLink : Page Msg -> Html Msg
 pageLink page =
     li [] [ a [onClick (ViewPage page), href "#"] [ text page.name ] ]
 
-pageDetails : Page -> Html Msg
+pageDetails : Page Msg -> Html Msg
 pageDetails page =
   article [ styleColumn 10 "#EEE" ] 
     [ ul []
@@ -201,31 +152,50 @@ pageDetails page =
         ]
     ]
       
-render : Pagelet -> Html Msg
+render : Pagelet Msg -> Html Msg
 render pagelet =
   (.html (.scrap (pick pagelet)))
 
-pageletBuild : Pagelet -> Pagelet -> Html Msg
+pageletBuild : Pagelet Msg -> Pagelet Msg -> Html Msg
 pageletBuild the_pagelet a_pagelet =
   section [ onClick (SelectPagelet a_pagelet), style [ "background-color" => ( if a_pagelet == the_pagelet then "#EEE" else "white" ) ] ] [ render a_pagelet ]
 
-pageBuild : Pagelet -> List Pagelet -> Html Msg
+pageBuild : Pagelet Msg -> List (Pagelet Msg) -> Html Msg
 pageBuild the_pagelet pagelets =
   article [ styleColumn 50 "white" ] (List.map (pageletBuild the_pagelet) pagelets)
       
-pageletDetails : Pagelet -> List Scrap -> Html Msg
+pageletDetails : Pagelet Msg -> List (Scrap Msg) -> Html Msg
 pageletDetails pagelet scraps =
   aside [ styleColumn 25 "#EEE" ]
     [ h2 [] [ text (.name (.scrap (pick pagelet))) ]
     , if (String.isEmpty (.name (.scrap (pick pagelet)))) then (ul [] []) else scrapsNav scraps
     ]
       
-scrapsNav : List Scrap -> Html Msg
+scrapsNav : List (Scrap Msg) -> Html Msg
 scrapsNav scraps =
     ul [] (List.map scrapLink scraps)      
 
-scrapLink : Scrap -> Html Msg
+scrapLink : Scrap Msg -> Html Msg
 scrapLink scrap =
     li [] [ a [ onClick (SelectScrap scrap), href "#" ] [ text scrap.name ] ]
 
 
+-- HTTP
+
+fetchPages : Cmd Msg
+fetchPages =
+    let
+        url = "http://taysar.com:9097/pile/page"
+    in
+        Task.perform FetchFail FetchPageSucceed 
+        <| Http.get JsonToPage.parseJson url
+            
+fetchScraps : Cmd Msg
+fetchScraps = 
+    let
+        url = "http://taysar.com:9097/scrap/json/taysar"
+        body = Http.empty
+    in
+        Task.perform FetchFail FetchScrapSucceed 
+        <| Http.post JsonToHtml.parseJson url body
+        
