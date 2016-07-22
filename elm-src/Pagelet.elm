@@ -1,6 +1,7 @@
 
 port module Pagelet exposing (..)
 
+import Dict exposing (..)
 import Tree exposing (..)
 import Scrap exposing (..)
 
@@ -10,8 +11,9 @@ import Scrap exposing (..)
 
 
 type alias PageletNode msg =
-    { scrap : Scrap msg
-    -- TODO: dictionary of options to values for the scrap
+    { id : Maybe String
+    , scrap : Scrap msg
+    , options : Dict String String
     }
     
 type alias Pagelet msg = Tree (PageletNode msg)
@@ -32,14 +34,16 @@ setScrap pagelet scrap =
 emptyPagelet : Pagelet msg
 emptyPagelet 
     = sprout 
-        { scrap = emptyScrap
-        -- , stuff = []
+        { id = Nothing
+        , scrap = emptyScrap
+        , options = Dict.empty
         } 
 
 testPagelet : Pagelet msg
 testPagelet 
     = sprout 
-        { scrap = (List.head testScraps) ? emptyScrap
-        -- , stuff = []
+        { id = Nothing
+        , scrap = emptyScrap
+        , options = Dict.empty
         } 
 

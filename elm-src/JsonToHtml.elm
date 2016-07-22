@@ -30,7 +30,12 @@ attributeser attributes =
 
 parseAttributes : Json.Decoder (List (Attribute msg))
 parseAttributes =
-    Json.map attributeser (Json.dict (Json.oneOf [ Json.map HimalayaString Json.string, Json.map HimalayaDict (Json.dict Json.string) ] ) )
+    Json.map attributeser 
+    <| Json.dict 
+    <| Json.oneOf 
+        [ Json.map HimalayaString Json.string
+        , Json.map HimalayaDict (Json.dict Json.string) 
+        ] 
         
 tagger : String -> String
 tagger tag =
@@ -46,8 +51,14 @@ parseElement =
         ("tagName" := (Json.map tagger Json.string))
         ("attributes" := parseAttributes)
         ("children" := (JsonExtra.lazy (\_ -> parseElements)))
+    , Json.object3 node
+        ("tagName" := (Json.map tagger Json.string))
+        (Json.succeed [])
+        ("children" := (JsonExtra.lazy (\_ -> parseElements)))
     , Json.object1 text
         ("content" := Json.string)
+    -- , Json.map (\s -> div [] [text s]) Json.string
+    , Json.succeed <| div [] [text "error"]
     ]
 
 parseElements : Json.Decoder (List (Html msg))

@@ -5166,6 +5166,11 @@ function badOneOf(problems)
 	return { tag: 'oneOf', problems: problems };
 }
 
+function badCustom(msg)
+{
+	return { tag: 'custom', msg: msg };
+}
+
 function bad(msg)
 {
 	return { tag: 'fail', msg: msg };
@@ -5202,6 +5207,11 @@ function badToString(problem)
 				return 'I ran into the following problems'
 					+ (context === '_' ? '' : ' at ' + context)
 					+ ':\n\n' + problems.join('\n');
+
+			case 'custom':
+				return 'A `customDecode` failed'
+					+ (context === '_' ? '' : ' at ' + context)
+					+ ' with the message: ' + problem.msg;
 
 			case 'fail':
 				return 'I ran into a `fail` decoder'
@@ -5405,7 +5415,7 @@ function runHelp(decoder, value)
 			var realResult = decoder.callback(result.value);
 			if (realResult.ctor === 'Err')
 			{
-				return badPrimitive('something custom', value);
+				return badCustom(realResult._0);
 			}
 			return ok(realResult._0);
 
@@ -6384,6 +6394,10 @@ var _elm_community$json_extra$Json_Decode_Extra$apply = _elm_lang$core$Json_Deco
 		}));
 var _elm_community$json_extra$Json_Decode_Extra_ops = _elm_community$json_extra$Json_Decode_Extra_ops || {};
 _elm_community$json_extra$Json_Decode_Extra_ops['|:'] = _elm_community$json_extra$Json_Decode_Extra$apply;
+
+var _elm_lang$core$Process$kill = _elm_lang$core$Native_Scheduler.kill;
+var _elm_lang$core$Process$sleep = _elm_lang$core$Native_Scheduler.sleep;
+var _elm_lang$core$Process$spawn = _elm_lang$core$Native_Scheduler.spawn;
 
 //import Native.Json //
 
@@ -8462,6 +8476,539 @@ var _elm_lang$html$Html_Events$Options = F2(
 		return {stopPropagation: a, preventDefault: b};
 	});
 
+var _elm_lang$websocket$Native_WebSocket = function() {
+
+function open(url, settings)
+{
+	return _elm_lang$core$Native_Scheduler.nativeBinding(function(callback)
+	{
+		try
+		{
+			var socket = new WebSocket(url);
+		}
+		catch(err)
+		{
+			return callback(_elm_lang$core$Native_Scheduler.fail({
+				ctor: err.name === 'SecurityError' ? 'BadSecurity' : 'BadArgs',
+				_0: err.message
+			}));
+		}
+
+		socket.addEventListener("open", function(event) {
+			callback(_elm_lang$core$Native_Scheduler.succeed(socket));
+		});
+
+		socket.addEventListener("message", function(event) {
+			_elm_lang$core$Native_Scheduler.rawSpawn(A2(settings.onMessage, socket, event.data));
+		});
+
+		socket.addEventListener("close", function(event) {
+			_elm_lang$core$Native_Scheduler.rawSpawn(settings.onClose({
+				code: event.code,
+				reason: event.reason,
+				wasClean: event.wasClean
+			}));
+		});
+
+		return function()
+		{
+			if (socket && socket.close)
+			{
+				socket.close();
+			}
+		};
+	});
+}
+
+function send(socket, string)
+{
+	return _elm_lang$core$Native_Scheduler.nativeBinding(function(callback)
+	{
+		var result =
+			socket.readyState === WebSocket.OPEN
+				? _elm_lang$core$Maybe$Nothing
+				: _elm_lang$core$Maybe$Just({ ctor: 'NotOpen' });
+
+		try
+		{
+			socket.send(string);
+		}
+		catch(err)
+		{
+			result = _elm_lang$core$Maybe$Just({ ctor: 'BadString' });
+		}
+
+		callback(_elm_lang$core$Native_Scheduler.succeed(result));
+	});
+}
+
+function close(code, reason, socket)
+{
+	return _elm_lang$core$Native_Scheduler.nativeBinding(function(callback) {
+		try
+		{
+			socket.close(code, reason);
+		}
+		catch(err)
+		{
+			return callback(_elm_lang$core$Native_Scheduler.fail(_elm_lang$core$Maybe$Just({
+				ctor: err.name === 'SyntaxError' ? 'BadReason' : 'BadCode'
+			})));
+		}
+		callback(_elm_lang$core$Native_Scheduler.succeed(_elm_lang$core$Maybe$Nothing));
+	});
+}
+
+function bytesQueued(socket)
+{
+	return _elm_lang$core$Native_Scheduler.nativeBinding(function(callback) {
+		callback(_elm_lang$core$Native_Scheduler.succeed(socket.bufferedAmount));
+	});
+}
+
+return {
+	open: F2(open),
+	send: F2(send),
+	close: F3(close),
+	bytesQueued: bytesQueued
+};
+
+}();
+
+var _elm_lang$websocket$WebSocket_LowLevel$bytesQueued = _elm_lang$websocket$Native_WebSocket.bytesQueued;
+var _elm_lang$websocket$WebSocket_LowLevel$send = _elm_lang$websocket$Native_WebSocket.send;
+var _elm_lang$websocket$WebSocket_LowLevel$closeWith = _elm_lang$websocket$Native_WebSocket.close;
+var _elm_lang$websocket$WebSocket_LowLevel$close = function (socket) {
+	return A2(
+		_elm_lang$core$Task$map,
+		_elm_lang$core$Basics$always(
+			{ctor: '_Tuple0'}),
+		A3(_elm_lang$websocket$WebSocket_LowLevel$closeWith, 1000, '', socket));
+};
+var _elm_lang$websocket$WebSocket_LowLevel$open = _elm_lang$websocket$Native_WebSocket.open;
+var _elm_lang$websocket$WebSocket_LowLevel$Settings = F2(
+	function (a, b) {
+		return {onMessage: a, onClose: b};
+	});
+var _elm_lang$websocket$WebSocket_LowLevel$WebSocket = {ctor: 'WebSocket'};
+var _elm_lang$websocket$WebSocket_LowLevel$BadArgs = {ctor: 'BadArgs'};
+var _elm_lang$websocket$WebSocket_LowLevel$BadSecurity = {ctor: 'BadSecurity'};
+var _elm_lang$websocket$WebSocket_LowLevel$BadReason = {ctor: 'BadReason'};
+var _elm_lang$websocket$WebSocket_LowLevel$BadCode = {ctor: 'BadCode'};
+var _elm_lang$websocket$WebSocket_LowLevel$BadString = {ctor: 'BadString'};
+var _elm_lang$websocket$WebSocket_LowLevel$NotOpen = {ctor: 'NotOpen'};
+
+var _elm_lang$websocket$WebSocket$closeConnection = function (connection) {
+	var _p0 = connection;
+	if (_p0.ctor === 'Opening') {
+		return _elm_lang$core$Process$kill(_p0._1);
+	} else {
+		return _elm_lang$websocket$WebSocket_LowLevel$close(_p0._0);
+	}
+};
+var _elm_lang$websocket$WebSocket$after = function (backoff) {
+	return (_elm_lang$core$Native_Utils.cmp(backoff, 1) < 0) ? _elm_lang$core$Task$succeed(
+		{ctor: '_Tuple0'}) : _elm_lang$core$Process$sleep(
+		_elm_lang$core$Basics$toFloat(
+			10 * Math.pow(2, backoff)));
+};
+var _elm_lang$websocket$WebSocket$removeQueue = F2(
+	function (name, state) {
+		return _elm_lang$core$Native_Utils.update(
+			state,
+			{
+				queues: A2(_elm_lang$core$Dict$remove, name, state.queues)
+			});
+	});
+var _elm_lang$websocket$WebSocket$updateSocket = F3(
+	function (name, connection, state) {
+		return _elm_lang$core$Native_Utils.update(
+			state,
+			{
+				sockets: A3(_elm_lang$core$Dict$insert, name, connection, state.sockets)
+			});
+	});
+var _elm_lang$websocket$WebSocket$add = F2(
+	function (value, maybeList) {
+		var _p1 = maybeList;
+		if (_p1.ctor === 'Nothing') {
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_List.fromArray(
+					[value]));
+		} else {
+			return _elm_lang$core$Maybe$Just(
+				A2(_elm_lang$core$List_ops['::'], value, _p1._0));
+		}
+	});
+var _elm_lang$websocket$WebSocket$buildSubDict = F2(
+	function (subs, dict) {
+		buildSubDict:
+		while (true) {
+			var _p2 = subs;
+			if (_p2.ctor === '[]') {
+				return dict;
+			} else {
+				if (_p2._0.ctor === 'Listen') {
+					var _v3 = _p2._1,
+						_v4 = A3(
+						_elm_lang$core$Dict$update,
+						_p2._0._0,
+						_elm_lang$websocket$WebSocket$add(_p2._0._1),
+						dict);
+					subs = _v3;
+					dict = _v4;
+					continue buildSubDict;
+				} else {
+					var _v5 = _p2._1,
+						_v6 = A3(
+						_elm_lang$core$Dict$update,
+						_p2._0._0,
+						function (_p3) {
+							return _elm_lang$core$Maybe$Just(
+								A2(
+									_elm_lang$core$Maybe$withDefault,
+									_elm_lang$core$Native_List.fromArray(
+										[]),
+									_p3));
+						},
+						dict);
+					subs = _v5;
+					dict = _v6;
+					continue buildSubDict;
+				}
+			}
+		}
+	});
+var _elm_lang$websocket$WebSocket_ops = _elm_lang$websocket$WebSocket_ops || {};
+_elm_lang$websocket$WebSocket_ops['&>'] = F2(
+	function (t1, t2) {
+		return A2(
+			_elm_lang$core$Task$andThen,
+			t1,
+			function (_p4) {
+				return t2;
+			});
+	});
+var _elm_lang$websocket$WebSocket$sendMessagesHelp = F3(
+	function (cmds, socketsDict, queuesDict) {
+		sendMessagesHelp:
+		while (true) {
+			var _p5 = cmds;
+			if (_p5.ctor === '[]') {
+				return _elm_lang$core$Task$succeed(queuesDict);
+			} else {
+				var _p9 = _p5._1;
+				var _p8 = _p5._0._0;
+				var _p7 = _p5._0._1;
+				var _p6 = A2(_elm_lang$core$Dict$get, _p8, socketsDict);
+				if ((_p6.ctor === 'Just') && (_p6._0.ctor === 'Connected')) {
+					return A2(
+						_elm_lang$websocket$WebSocket_ops['&>'],
+						A2(_elm_lang$websocket$WebSocket_LowLevel$send, _p6._0._0, _p7),
+						A3(_elm_lang$websocket$WebSocket$sendMessagesHelp, _p9, socketsDict, queuesDict));
+				} else {
+					var _v9 = _p9,
+						_v10 = socketsDict,
+						_v11 = A3(
+						_elm_lang$core$Dict$update,
+						_p8,
+						_elm_lang$websocket$WebSocket$add(_p7),
+						queuesDict);
+					cmds = _v9;
+					socketsDict = _v10;
+					queuesDict = _v11;
+					continue sendMessagesHelp;
+				}
+			}
+		}
+	});
+var _elm_lang$websocket$WebSocket$subscription = _elm_lang$core$Native_Platform.leaf('WebSocket');
+var _elm_lang$websocket$WebSocket$command = _elm_lang$core$Native_Platform.leaf('WebSocket');
+var _elm_lang$websocket$WebSocket$State = F3(
+	function (a, b, c) {
+		return {sockets: a, queues: b, subs: c};
+	});
+var _elm_lang$websocket$WebSocket$init = _elm_lang$core$Task$succeed(
+	A3(_elm_lang$websocket$WebSocket$State, _elm_lang$core$Dict$empty, _elm_lang$core$Dict$empty, _elm_lang$core$Dict$empty));
+var _elm_lang$websocket$WebSocket$Send = F2(
+	function (a, b) {
+		return {ctor: 'Send', _0: a, _1: b};
+	});
+var _elm_lang$websocket$WebSocket$send = F2(
+	function (url, message) {
+		return _elm_lang$websocket$WebSocket$command(
+			A2(_elm_lang$websocket$WebSocket$Send, url, message));
+	});
+var _elm_lang$websocket$WebSocket$cmdMap = F2(
+	function (_p11, _p10) {
+		var _p12 = _p10;
+		return A2(_elm_lang$websocket$WebSocket$Send, _p12._0, _p12._1);
+	});
+var _elm_lang$websocket$WebSocket$KeepAlive = function (a) {
+	return {ctor: 'KeepAlive', _0: a};
+};
+var _elm_lang$websocket$WebSocket$keepAlive = function (url) {
+	return _elm_lang$websocket$WebSocket$subscription(
+		_elm_lang$websocket$WebSocket$KeepAlive(url));
+};
+var _elm_lang$websocket$WebSocket$Listen = F2(
+	function (a, b) {
+		return {ctor: 'Listen', _0: a, _1: b};
+	});
+var _elm_lang$websocket$WebSocket$listen = F2(
+	function (url, tagger) {
+		return _elm_lang$websocket$WebSocket$subscription(
+			A2(_elm_lang$websocket$WebSocket$Listen, url, tagger));
+	});
+var _elm_lang$websocket$WebSocket$subMap = F2(
+	function (func, sub) {
+		var _p13 = sub;
+		if (_p13.ctor === 'Listen') {
+			return A2(
+				_elm_lang$websocket$WebSocket$Listen,
+				_p13._0,
+				function (_p14) {
+					return func(
+						_p13._1(_p14));
+				});
+		} else {
+			return _elm_lang$websocket$WebSocket$KeepAlive(_p13._0);
+		}
+	});
+var _elm_lang$websocket$WebSocket$Connected = function (a) {
+	return {ctor: 'Connected', _0: a};
+};
+var _elm_lang$websocket$WebSocket$Opening = F2(
+	function (a, b) {
+		return {ctor: 'Opening', _0: a, _1: b};
+	});
+var _elm_lang$websocket$WebSocket$BadOpen = function (a) {
+	return {ctor: 'BadOpen', _0: a};
+};
+var _elm_lang$websocket$WebSocket$GoodOpen = F2(
+	function (a, b) {
+		return {ctor: 'GoodOpen', _0: a, _1: b};
+	});
+var _elm_lang$websocket$WebSocket$Die = function (a) {
+	return {ctor: 'Die', _0: a};
+};
+var _elm_lang$websocket$WebSocket$Receive = F2(
+	function (a, b) {
+		return {ctor: 'Receive', _0: a, _1: b};
+	});
+var _elm_lang$websocket$WebSocket$open = F2(
+	function (name, router) {
+		return A2(
+			_elm_lang$websocket$WebSocket_LowLevel$open,
+			name,
+			{
+				onMessage: F2(
+					function (_p15, msg) {
+						return A2(
+							_elm_lang$core$Platform$sendToSelf,
+							router,
+							A2(_elm_lang$websocket$WebSocket$Receive, name, msg));
+					}),
+				onClose: function (details) {
+					return A2(
+						_elm_lang$core$Platform$sendToSelf,
+						router,
+						_elm_lang$websocket$WebSocket$Die(name));
+				}
+			});
+	});
+var _elm_lang$websocket$WebSocket$attemptOpen = F3(
+	function (router, backoff, name) {
+		var badOpen = function (_p16) {
+			return A2(
+				_elm_lang$core$Platform$sendToSelf,
+				router,
+				_elm_lang$websocket$WebSocket$BadOpen(name));
+		};
+		var goodOpen = function (ws) {
+			return A2(
+				_elm_lang$core$Platform$sendToSelf,
+				router,
+				A2(_elm_lang$websocket$WebSocket$GoodOpen, name, ws));
+		};
+		var actuallyAttemptOpen = A2(
+			_elm_lang$core$Task$onError,
+			A2(
+				_elm_lang$core$Task$andThen,
+				A2(_elm_lang$websocket$WebSocket$open, name, router),
+				goodOpen),
+			badOpen);
+		return _elm_lang$core$Process$spawn(
+			A2(
+				_elm_lang$websocket$WebSocket_ops['&>'],
+				_elm_lang$websocket$WebSocket$after(backoff),
+				actuallyAttemptOpen));
+	});
+var _elm_lang$websocket$WebSocket$onEffects = F4(
+	function (router, cmds, subs, state) {
+		var newSubs = A2(_elm_lang$websocket$WebSocket$buildSubDict, subs, _elm_lang$core$Dict$empty);
+		var cleanup = function (newQueues) {
+			var rightStep = F3(
+				function (name, connection, getNewSockets) {
+					return A2(
+						_elm_lang$websocket$WebSocket_ops['&>'],
+						_elm_lang$websocket$WebSocket$closeConnection(connection),
+						getNewSockets);
+				});
+			var bothStep = F4(
+				function (name, _p17, connection, getNewSockets) {
+					return A2(
+						_elm_lang$core$Task$map,
+						A2(_elm_lang$core$Dict$insert, name, connection),
+						getNewSockets);
+				});
+			var leftStep = F3(
+				function (name, _p18, getNewSockets) {
+					return A2(
+						_elm_lang$core$Task$andThen,
+						getNewSockets,
+						function (newSockets) {
+							return A2(
+								_elm_lang$core$Task$andThen,
+								A3(_elm_lang$websocket$WebSocket$attemptOpen, router, 0, name),
+								function (pid) {
+									return _elm_lang$core$Task$succeed(
+										A3(
+											_elm_lang$core$Dict$insert,
+											name,
+											A2(_elm_lang$websocket$WebSocket$Opening, 0, pid),
+											newSockets));
+								});
+						});
+				});
+			var newEntries = A2(
+				_elm_lang$core$Dict$union,
+				newQueues,
+				A2(
+					_elm_lang$core$Dict$map,
+					F2(
+						function (k, v) {
+							return _elm_lang$core$Native_List.fromArray(
+								[]);
+						}),
+					newSubs));
+			return A2(
+				_elm_lang$core$Task$andThen,
+				A6(
+					_elm_lang$core$Dict$merge,
+					leftStep,
+					bothStep,
+					rightStep,
+					newEntries,
+					state.sockets,
+					_elm_lang$core$Task$succeed(_elm_lang$core$Dict$empty)),
+				function (newSockets) {
+					return _elm_lang$core$Task$succeed(
+						A3(_elm_lang$websocket$WebSocket$State, newSockets, newQueues, newSubs));
+				});
+		};
+		var sendMessagesGetNewQueues = A3(_elm_lang$websocket$WebSocket$sendMessagesHelp, cmds, state.sockets, state.queues);
+		return A2(_elm_lang$core$Task$andThen, sendMessagesGetNewQueues, cleanup);
+	});
+var _elm_lang$websocket$WebSocket$onSelfMsg = F3(
+	function (router, selfMsg, state) {
+		var _p19 = selfMsg;
+		switch (_p19.ctor) {
+			case 'Receive':
+				var sends = A2(
+					_elm_lang$core$List$map,
+					function (tagger) {
+						return A2(
+							_elm_lang$core$Platform$sendToApp,
+							router,
+							tagger(_p19._1));
+					},
+					A2(
+						_elm_lang$core$Maybe$withDefault,
+						_elm_lang$core$Native_List.fromArray(
+							[]),
+						A2(_elm_lang$core$Dict$get, _p19._0, state.subs)));
+				return A2(
+					_elm_lang$websocket$WebSocket_ops['&>'],
+					_elm_lang$core$Task$sequence(sends),
+					_elm_lang$core$Task$succeed(state));
+			case 'Die':
+				var _p21 = _p19._0;
+				var _p20 = A2(_elm_lang$core$Dict$get, _p21, state.sockets);
+				if (_p20.ctor === 'Nothing') {
+					return _elm_lang$core$Task$succeed(state);
+				} else {
+					return A2(
+						_elm_lang$core$Task$andThen,
+						A3(_elm_lang$websocket$WebSocket$attemptOpen, router, 0, _p21),
+						function (pid) {
+							return _elm_lang$core$Task$succeed(
+								A3(
+									_elm_lang$websocket$WebSocket$updateSocket,
+									_p21,
+									A2(_elm_lang$websocket$WebSocket$Opening, 0, pid),
+									state));
+						});
+				}
+			case 'GoodOpen':
+				var _p24 = _p19._1;
+				var _p23 = _p19._0;
+				var _p22 = A2(_elm_lang$core$Dict$get, _p23, state.queues);
+				if (_p22.ctor === 'Nothing') {
+					return _elm_lang$core$Task$succeed(
+						A3(
+							_elm_lang$websocket$WebSocket$updateSocket,
+							_p23,
+							_elm_lang$websocket$WebSocket$Connected(_p24),
+							state));
+				} else {
+					return A3(
+						_elm_lang$core$List$foldl,
+						F2(
+							function (msg, task) {
+								return A2(
+									_elm_lang$websocket$WebSocket_ops['&>'],
+									A2(_elm_lang$websocket$WebSocket_LowLevel$send, _p24, msg),
+									task);
+							}),
+						_elm_lang$core$Task$succeed(
+							A2(
+								_elm_lang$websocket$WebSocket$removeQueue,
+								_p23,
+								A3(
+									_elm_lang$websocket$WebSocket$updateSocket,
+									_p23,
+									_elm_lang$websocket$WebSocket$Connected(_p24),
+									state))),
+						_p22._0);
+				}
+			default:
+				var _p27 = _p19._0;
+				var _p25 = A2(_elm_lang$core$Dict$get, _p27, state.sockets);
+				if (_p25.ctor === 'Nothing') {
+					return _elm_lang$core$Task$succeed(state);
+				} else {
+					if (_p25._0.ctor === 'Opening') {
+						var _p26 = _p25._0._0;
+						return A2(
+							_elm_lang$core$Task$andThen,
+							A3(_elm_lang$websocket$WebSocket$attemptOpen, router, _p26 + 1, _p27),
+							function (pid) {
+								return _elm_lang$core$Task$succeed(
+									A3(
+										_elm_lang$websocket$WebSocket$updateSocket,
+										_p27,
+										A2(_elm_lang$websocket$WebSocket$Opening, _p26 + 1, pid),
+										state));
+							});
+					} else {
+						return _elm_lang$core$Task$succeed(state);
+					}
+				}
+		}
+	});
+_elm_lang$core$Native_Platform.effectManagers['WebSocket'] = {pkg: 'elm-lang/websocket', init: _elm_lang$websocket$WebSocket$init, onEffects: _elm_lang$websocket$WebSocket$onEffects, onSelfMsg: _elm_lang$websocket$WebSocket$onSelfMsg, tag: 'fx', cmdMap: _elm_lang$websocket$WebSocket$cmdMap, subMap: _elm_lang$websocket$WebSocket$subMap};
+
 //import Dict, List, Maybe, Native.Scheduler //
 
 var _evancz$elm_http$Native_Http = function() {
@@ -8881,13 +9428,189 @@ var _surprisetalk$aiport_annex_page$JsonToHtml$parseElement = _elm_lang$core$Jso
 					function (_p1) {
 						return _surprisetalk$aiport_annex_page$JsonToHtml$parseElements;
 					}))),
+			A4(
+			_elm_lang$core$Json_Decode$object3,
+			_elm_lang$html$Html$node,
+			A2(
+				_elm_lang$core$Json_Decode_ops[':='],
+				'tagName',
+				A2(_elm_lang$core$Json_Decode$map, _surprisetalk$aiport_annex_page$JsonToHtml$tagger, _elm_lang$core$Json_Decode$string)),
+			_elm_lang$core$Json_Decode$succeed(
+				_elm_lang$core$Native_List.fromArray(
+					[])),
+			A2(
+				_elm_lang$core$Json_Decode_ops[':='],
+				'children',
+				_elm_community$json_extra$Json_Decode_Extra$lazy(
+					function (_p2) {
+						return _surprisetalk$aiport_annex_page$JsonToHtml$parseElements;
+					}))),
 			A2(
 			_elm_lang$core$Json_Decode$object1,
 			_elm_lang$html$Html$text,
-			A2(_elm_lang$core$Json_Decode_ops[':='], 'content', _elm_lang$core$Json_Decode$string))
+			A2(_elm_lang$core$Json_Decode_ops[':='], 'content', _elm_lang$core$Json_Decode$string)),
+			_elm_lang$core$Json_Decode$succeed(
+			A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html$text('error')
+					])))
 		]));
 var _surprisetalk$aiport_annex_page$JsonToHtml$parseElements = _elm_lang$core$Json_Decode$list(_surprisetalk$aiport_annex_page$JsonToHtml$parseElement);
 var _surprisetalk$aiport_annex_page$JsonToHtml$parseJson = _surprisetalk$aiport_annex_page$JsonToHtml$parseElements;
+
+var _surprisetalk$aiport_annex_page$Scrap$emptyScrap = {
+	name: '',
+	htmler: function (_p0) {
+		return _elm_lang$core$Native_List.fromArray(
+			[
+				A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[]),
+				_elm_lang$core$Native_List.fromArray(
+					[]))
+			]);
+	}
+};
+var _surprisetalk$aiport_annex_page$Scrap$Scrap = F2(
+	function (a, b) {
+		return {name: a, htmler: b};
+	});
+
+var _surprisetalk$aiport_annex_page$JsonToScrap$scrapify = F2(
+	function (name, htmler) {
+		return {name: name, htmler: htmler};
+	});
+var _surprisetalk$aiport_annex_page$JsonToScrap$variableMapper = F2(
+	function (functions, x) {
+		return A2(
+			_elm_lang$core$List$map,
+			function (f) {
+				return f(x);
+			},
+			functions);
+	});
+var _surprisetalk$aiport_annex_page$JsonToScrap$texter = F2(
+	function (str, htmls) {
+		return _elm_lang$html$Html$text(str);
+	});
+var _surprisetalk$aiport_annex_page$JsonToScrap$noder = F4(
+	function (tag, attributes, htmler, htmls) {
+		return A3(
+			_elm_lang$html$Html$node,
+			tag,
+			attributes,
+			htmler(htmls));
+	});
+var _surprisetalk$aiport_annex_page$JsonToScrap$tagger = function (tag) {
+	return A2(_elm_lang$core$String$endsWith, '/', tag) ? A2(_elm_lang$core$String$dropRight, 1, tag) : tag;
+};
+var _surprisetalk$aiport_annex_page$JsonToScrap$attributer = F2(
+	function (key, val) {
+		var _p0 = val;
+		if (_p0.ctor === 'HimalayaString') {
+			return A2(_elm_lang$html$Html_Attributes$attribute, key, _p0._0);
+		} else {
+			return _elm_lang$html$Html_Attributes$style(
+				_elm_lang$core$Dict$values(
+					A2(
+						_elm_lang$core$Dict$map,
+						F2(
+							function (v0, v1) {
+								return {ctor: '_Tuple2', _0: v0, _1: v1};
+							}),
+						_p0._0)));
+		}
+	});
+var _surprisetalk$aiport_annex_page$JsonToScrap$attributeser = function (attributes) {
+	return _elm_lang$core$Dict$values(
+		A2(_elm_lang$core$Dict$map, _surprisetalk$aiport_annex_page$JsonToScrap$attributer, attributes));
+};
+var _surprisetalk$aiport_annex_page$JsonToScrap$HimalayaDict = function (a) {
+	return {ctor: 'HimalayaDict', _0: a};
+};
+var _surprisetalk$aiport_annex_page$JsonToScrap$HimalayaString = function (a) {
+	return {ctor: 'HimalayaString', _0: a};
+};
+var _surprisetalk$aiport_annex_page$JsonToScrap$parseAttributes = A2(
+	_elm_lang$core$Json_Decode$map,
+	_surprisetalk$aiport_annex_page$JsonToScrap$attributeser,
+	_elm_lang$core$Json_Decode$dict(
+		_elm_lang$core$Json_Decode$oneOf(
+			_elm_lang$core$Native_List.fromArray(
+				[
+					A2(_elm_lang$core$Json_Decode$map, _surprisetalk$aiport_annex_page$JsonToScrap$HimalayaString, _elm_lang$core$Json_Decode$string),
+					A2(
+					_elm_lang$core$Json_Decode$map,
+					_surprisetalk$aiport_annex_page$JsonToScrap$HimalayaDict,
+					_elm_lang$core$Json_Decode$dict(_elm_lang$core$Json_Decode$string))
+				]))));
+var _surprisetalk$aiport_annex_page$JsonToScrap$parseElement = _elm_lang$core$Json_Decode$oneOf(
+	_elm_lang$core$Native_List.fromArray(
+		[
+			A4(
+			_elm_lang$core$Json_Decode$object3,
+			_surprisetalk$aiport_annex_page$JsonToScrap$noder,
+			A2(
+				_elm_lang$core$Json_Decode_ops[':='],
+				'tagName',
+				A2(_elm_lang$core$Json_Decode$map, _surprisetalk$aiport_annex_page$JsonToScrap$tagger, _elm_lang$core$Json_Decode$string)),
+			A2(_elm_lang$core$Json_Decode_ops[':='], 'attributes', _surprisetalk$aiport_annex_page$JsonToScrap$parseAttributes),
+			A2(
+				_elm_lang$core$Json_Decode_ops[':='],
+				'children',
+				_elm_community$json_extra$Json_Decode_Extra$lazy(
+					function (_p1) {
+						return _surprisetalk$aiport_annex_page$JsonToScrap$parseElements;
+					}))),
+			A4(
+			_elm_lang$core$Json_Decode$object3,
+			_surprisetalk$aiport_annex_page$JsonToScrap$noder,
+			A2(
+				_elm_lang$core$Json_Decode_ops[':='],
+				'tagName',
+				A2(_elm_lang$core$Json_Decode$map, _surprisetalk$aiport_annex_page$JsonToScrap$tagger, _elm_lang$core$Json_Decode$string)),
+			_elm_lang$core$Json_Decode$succeed(
+				_elm_lang$core$Native_List.fromArray(
+					[])),
+			A2(
+				_elm_lang$core$Json_Decode_ops[':='],
+				'children',
+				_elm_community$json_extra$Json_Decode_Extra$lazy(
+					function (_p2) {
+						return _surprisetalk$aiport_annex_page$JsonToScrap$parseElements;
+					}))),
+			A2(
+			_elm_lang$core$Json_Decode$object1,
+			_surprisetalk$aiport_annex_page$JsonToScrap$texter,
+			A2(_elm_lang$core$Json_Decode_ops[':='], 'content', _elm_lang$core$Json_Decode$string)),
+			_elm_lang$core$Json_Decode$succeed(
+			function (_p3) {
+				return A2(
+					_elm_lang$html$Html$div,
+					_elm_lang$core$Native_List.fromArray(
+						[]),
+					_elm_lang$core$Native_List.fromArray(
+						[
+							_elm_lang$html$Html$text('error')
+						]));
+			})
+		]));
+var _surprisetalk$aiport_annex_page$JsonToScrap$parseElements = A2(
+	_elm_lang$core$Json_Decode$map,
+	_surprisetalk$aiport_annex_page$JsonToScrap$variableMapper,
+	_elm_lang$core$Json_Decode$list(_surprisetalk$aiport_annex_page$JsonToScrap$parseElement));
+var _surprisetalk$aiport_annex_page$JsonToScrap$parseHimalaya = _surprisetalk$aiport_annex_page$JsonToScrap$parseElements;
+var _surprisetalk$aiport_annex_page$JsonToScrap$parseScrap = A3(
+	_elm_lang$core$Json_Decode$object2,
+	_surprisetalk$aiport_annex_page$JsonToScrap$scrapify,
+	A2(_elm_lang$core$Json_Decode_ops[':='], 'name', _elm_lang$core$Json_Decode$string),
+	A2(_elm_lang$core$Json_Decode_ops[':='], 'html', _surprisetalk$aiport_annex_page$JsonToScrap$parseHimalaya));
+var _surprisetalk$aiport_annex_page$JsonToScrap$parseJson = _surprisetalk$aiport_annex_page$JsonToScrap$parseScrap;
 
 var _surprisetalk$aiport_annex_page$Tree$pick = function (tree) {
 	var _p0 = tree;
@@ -8906,77 +9629,10 @@ var _surprisetalk$aiport_annex_page$Tree$sprout = function (v) {
 			[]));
 };
 
-var _surprisetalk$aiport_annex_page$Scrap$testScraps = _elm_lang$core$Native_List.fromArray(
-	[
-		{
-		name: 'header',
-		html: A2(
-			_elm_lang$html$Html$header,
-			_elm_lang$core$Native_List.fromArray(
-				[]),
-			_elm_lang$core$Native_List.fromArray(
-				[
-					A2(
-					_elm_lang$html$Html$h1,
-					_elm_lang$core$Native_List.fromArray(
-						[]),
-					_elm_lang$core$Native_List.fromArray(
-						[
-							_elm_lang$html$Html$text('TAYSAR')
-						]))
-				]))
-	},
-		{
-		name: 'body',
-		html: A2(
-			_elm_lang$html$Html$article,
-			_elm_lang$core$Native_List.fromArray(
-				[]),
-			_elm_lang$core$Native_List.fromArray(
-				[
-					A2(
-					_elm_lang$html$Html$section,
-					_elm_lang$core$Native_List.fromArray(
-						[]),
-					_elm_lang$core$Native_List.fromArray(
-						[
-							A2(
-							_elm_lang$html$Html$p,
-							_elm_lang$core$Native_List.fromArray(
-								[]),
-							_elm_lang$core$Native_List.fromArray(
-								[
-									_elm_lang$html$Html$text('lorem ipsum')
-								]))
-						]))
-				]))
-	},
-		{
-		name: 'footer',
-		html: A2(
-			_elm_lang$html$Html$footer,
-			_elm_lang$core$Native_List.fromArray(
-				[]),
-			_elm_lang$core$Native_List.fromArray(
-				[]))
-	}
-	]);
-var _surprisetalk$aiport_annex_page$Scrap$emptyScrap = {
-	name: '',
-	html: A2(
-		_elm_lang$html$Html$div,
-		_elm_lang$core$Native_List.fromArray(
-			[]),
-		_elm_lang$core$Native_List.fromArray(
-			[]))
-};
-var _surprisetalk$aiport_annex_page$Scrap$Scrap = F2(
-	function (a, b) {
-		return {name: a, html: b};
-	});
-
+var _surprisetalk$aiport_annex_page$Pagelet$testPagelet = _surprisetalk$aiport_annex_page$Tree$sprout(
+	{id: _elm_lang$core$Maybe$Nothing, scrap: _surprisetalk$aiport_annex_page$Scrap$emptyScrap, options: _elm_lang$core$Dict$empty});
 var _surprisetalk$aiport_annex_page$Pagelet$emptyPagelet = _surprisetalk$aiport_annex_page$Tree$sprout(
-	{scrap: _surprisetalk$aiport_annex_page$Scrap$emptyScrap});
+	{id: _elm_lang$core$Maybe$Nothing, scrap: _surprisetalk$aiport_annex_page$Scrap$emptyScrap, options: _elm_lang$core$Dict$empty});
 var _surprisetalk$aiport_annex_page$Pagelet$setScrap = F2(
 	function (pagelet, scrap) {
 		var _p0 = pagelet;
@@ -8998,16 +9654,10 @@ _surprisetalk$aiport_annex_page$Pagelet_ops['?'] = F2(
 	function (maybe, $default) {
 		return A2(_elm_lang$core$Maybe$withDefault, $default, maybe);
 	});
-var _surprisetalk$aiport_annex_page$Pagelet$testPagelet = _surprisetalk$aiport_annex_page$Tree$sprout(
-	{
-		scrap: A2(
-			_surprisetalk$aiport_annex_page$Pagelet_ops['?'],
-			_elm_lang$core$List$head(_surprisetalk$aiport_annex_page$Scrap$testScraps),
-			_surprisetalk$aiport_annex_page$Scrap$emptyScrap)
+var _surprisetalk$aiport_annex_page$Pagelet$PageletNode = F3(
+	function (a, b, c) {
+		return {id: a, scrap: b, options: c};
 	});
-var _surprisetalk$aiport_annex_page$Pagelet$PageletNode = function (a) {
-	return {scrap: a};
-};
 
 var _surprisetalk$aiport_annex_page$Page$testPages = _elm_lang$core$Native_List.fromArray(
 	[
@@ -9041,22 +9691,22 @@ var _surprisetalk$aiport_annex_page$Page$Page = F3(
 		return {name: a, route: b, pagelets: c};
 	});
 
-var _surprisetalk$aiport_annex_page$JsonToPage$scrapper = function (name) {
-	return _surprisetalk$aiport_annex_page$Scrap$emptyScrap;
-};
-var _surprisetalk$aiport_annex_page$JsonToPage$pageleterer = F2(
-	function (scrapName, pagelets) {
+var _surprisetalk$aiport_annex_page$JsonToPage$pageleterer = F3(
+	function (id, scrap, pagelets) {
 		return A2(
 			_surprisetalk$aiport_annex_page$Pagelet$pageleter,
 			{
-				scrap: _surprisetalk$aiport_annex_page$JsonToPage$scrapper(scrapName)
+				id: _elm_lang$core$Maybe$Just(id),
+				options: _elm_lang$core$Dict$empty,
+				scrap: scrap
 			},
 			pagelets);
 	});
-var _surprisetalk$aiport_annex_page$JsonToPage$decodePagelet = A3(
-	_elm_lang$core$Json_Decode$object2,
+var _surprisetalk$aiport_annex_page$JsonToPage$decodePagelet = A4(
+	_elm_lang$core$Json_Decode$object3,
 	_surprisetalk$aiport_annex_page$JsonToPage$pageleterer,
-	A2(_elm_lang$core$Json_Decode_ops[':='], 'scrap', _elm_lang$core$Json_Decode$string),
+	A2(_elm_lang$core$Json_Decode_ops[':='], '_id', _elm_lang$core$Json_Decode$string),
+	A2(_elm_lang$core$Json_Decode_ops[':='], 'scrap', _surprisetalk$aiport_annex_page$JsonToScrap$parseJson),
 	A2(
 		_elm_lang$core$Json_Decode_ops[':='],
 		'pagelets',
@@ -9071,20 +9721,174 @@ var _surprisetalk$aiport_annex_page$JsonToPage$decodePage = A4(
 	A2(_elm_lang$core$Json_Decode_ops[':='], 'name', _elm_lang$core$Json_Decode$string),
 	A2(_elm_lang$core$Json_Decode_ops[':='], 'route', _elm_lang$core$Json_Decode$string),
 	A2(_elm_lang$core$Json_Decode_ops[':='], 'pagelets', _surprisetalk$aiport_annex_page$JsonToPage$decodePagelets));
-var _surprisetalk$aiport_annex_page$JsonToPage$decodePages = _elm_lang$core$Json_Decode$list(_surprisetalk$aiport_annex_page$JsonToPage$decodePage);
-var _surprisetalk$aiport_annex_page$JsonToPage$parseJson = _surprisetalk$aiport_annex_page$JsonToPage$decodePages;
+var _surprisetalk$aiport_annex_page$JsonToPage$parseJson = _surprisetalk$aiport_annex_page$JsonToPage$decodePage;
 
+var _surprisetalk$aiport_annex_page$Main$scrapLink = function (scrap) {
+	return A2(
+		_elm_lang$html$Html$li,
+		_elm_lang$core$Native_List.fromArray(
+			[]),
+		_elm_lang$core$Native_List.fromArray(
+			[
+				A2(
+				_elm_lang$html$Html$a,
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html_Attributes$href('#')
+					]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html$text(scrap.name)
+					]))
+			]));
+};
+var _surprisetalk$aiport_annex_page$Main$scrapsNav = function (scraps) {
+	return A2(
+		_elm_lang$html$Html$ul,
+		_elm_lang$core$Native_List.fromArray(
+			[]),
+		A2(_elm_lang$core$List$map, _surprisetalk$aiport_annex_page$Main$scrapLink, scraps));
+};
 var _surprisetalk$aiport_annex_page$Main$render = function (pagelet) {
 	return function (_) {
-		return _.html;
+		return _.htmler;
 	}(
 		function (_) {
 			return _.scrap;
 		}(
-			_surprisetalk$aiport_annex_page$Tree$pick(pagelet)));
+			_surprisetalk$aiport_annex_page$Tree$pick(pagelet)))(
+		_elm_lang$core$Native_List.fromArray(
+			[]));
 };
-var _surprisetalk$aiport_annex_page$Main$subscriptions = function (model) {
-	return _elm_lang$core$Platform_Sub$none;
+var _surprisetalk$aiport_annex_page$Main$update = F2(
+	function (msg, model) {
+		var _p0 = msg;
+		switch (_p0.ctor) {
+			case 'LoadPages':
+				return {
+					ctor: '_Tuple2',
+					_0: _elm_lang$core$Native_Utils.update(
+						model,
+						{pages: _p0._0}),
+					_1: _elm_lang$core$Platform_Cmd$none
+				};
+			case 'LoadScraps':
+				return {
+					ctor: '_Tuple2',
+					_0: _elm_lang$core$Native_Utils.update(
+						model,
+						{scraps: _p0._0}),
+					_1: _elm_lang$core$Platform_Cmd$none
+				};
+			case 'SelectPage':
+				var workspace = model.workspace;
+				return {
+					ctor: '_Tuple2',
+					_0: _elm_lang$core$Native_Utils.update(
+						model,
+						{
+							workspace: _elm_lang$core$Native_Utils.update(
+								workspace,
+								{
+									page: _elm_lang$core$Maybe$Just(_p0._0)
+								})
+						}),
+					_1: _elm_lang$core$Platform_Cmd$none
+				};
+			case 'SelectPagelet':
+				var workspace = model.workspace;
+				return {
+					ctor: '_Tuple2',
+					_0: _elm_lang$core$Native_Utils.update(
+						model,
+						{
+							workspace: _elm_lang$core$Native_Utils.update(
+								workspace,
+								{
+									pagelet: _elm_lang$core$Maybe$Just(_p0._0)
+								})
+						}),
+					_1: _elm_lang$core$Platform_Cmd$none
+				};
+			case 'UpdatePage':
+				var page = model.workspace.page;
+				var workspace = model.workspace;
+				return {
+					ctor: '_Tuple2',
+					_0: _elm_lang$core$Native_Utils.update(
+						model,
+						{
+							workspace: _elm_lang$core$Native_Utils.update(
+								workspace,
+								{page: page})
+						}),
+					_1: _elm_lang$core$Platform_Cmd$none
+				};
+			case 'UpdatePageName':
+				var workspace = model.workspace;
+				var _p1 = model.workspace.page;
+				if (_p1.ctor === 'Nothing') {
+					return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+				} else {
+					return {
+						ctor: '_Tuple2',
+						_0: _elm_lang$core$Native_Utils.update(
+							model,
+							{
+								workspace: _elm_lang$core$Native_Utils.update(
+									workspace,
+									{
+										page: _elm_lang$core$Maybe$Just(
+											_elm_lang$core$Native_Utils.update(
+												_p1._0,
+												{name: _p0._0}))
+									})
+							}),
+						_1: _elm_lang$core$Platform_Cmd$none
+					};
+				}
+			default:
+				var workspace = model.workspace;
+				var _p2 = model.workspace.page;
+				if (_p2.ctor === 'Nothing') {
+					return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+				} else {
+					return {
+						ctor: '_Tuple2',
+						_0: _elm_lang$core$Native_Utils.update(
+							model,
+							{
+								workspace: _elm_lang$core$Native_Utils.update(
+									workspace,
+									{
+										page: _elm_lang$core$Maybe$Just(
+											_elm_lang$core$Native_Utils.update(
+												_p2._0,
+												{route: _p0._0}))
+									})
+							}),
+						_1: _elm_lang$core$Platform_Cmd$none
+					};
+				}
+		}
+	});
+var _surprisetalk$aiport_annex_page$Main$localhost = 'ws://taysar.com:9097/';
+var _surprisetalk$aiport_annex_page$Main$init = {
+	ctor: '_Tuple2',
+	_0: {
+		pages: _elm_lang$core$Native_List.fromArray(
+			[]),
+		scraps: _elm_lang$core$Native_List.fromArray(
+			[]),
+		workspace: {
+			hoverscrap: _elm_lang$core$Maybe$Nothing,
+			overpagelets: _elm_lang$core$Native_List.fromArray(
+				[]),
+			page: _elm_lang$core$Maybe$Nothing,
+			pagelet: _elm_lang$core$Maybe$Nothing
+		}
+	},
+	_1: _elm_lang$core$Platform_Cmd$none
 };
 var _surprisetalk$aiport_annex_page$Main_ops = _surprisetalk$aiport_annex_page$Main_ops || {};
 _surprisetalk$aiport_annex_page$Main_ops['?'] = F2(
@@ -9115,292 +9919,149 @@ var _surprisetalk$aiport_annex_page$Main$styleColumn = F2(
 					A2(_surprisetalk$aiport_annex_page$Main_ops['=>'], 'background-color', color)
 				]));
 	});
-var _surprisetalk$aiport_annex_page$Main$pageDetails = function (page) {
+var _surprisetalk$aiport_annex_page$Main$pageletDetails = function (pagelet) {
+	return _elm_lang$core$Native_Utils.eq(pagelet, _elm_lang$core$Maybe$Nothing) ? A2(
+		_elm_lang$html$Html$div,
+		_elm_lang$core$Native_List.fromArray(
+			[
+				A2(_surprisetalk$aiport_annex_page$Main$styleColumn, 25, '#EFEFEF')
+			]),
+		_elm_lang$core$Native_List.fromArray(
+			[])) : A2(
+		_elm_lang$html$Html$div,
+		_elm_lang$core$Native_List.fromArray(
+			[
+				A2(_surprisetalk$aiport_annex_page$Main$styleColumn, 25, '#EFEFEF')
+			]),
+		_elm_lang$core$Native_List.fromArray(
+			[]));
+};
+var _surprisetalk$aiport_annex_page$Main$workspaceDetails = function (page) {
 	return A2(
 		_elm_lang$html$Html$article,
+		_elm_lang$core$Native_List.fromArray(
+			[
+				A2(_surprisetalk$aiport_annex_page$Main$styleColumn, 50, 'white')
+			]),
+		_elm_lang$core$List$concat(
+			A2(_elm_lang$core$List$map, _surprisetalk$aiport_annex_page$Main$render, page.pagelets)));
+};
+var _surprisetalk$aiport_annex_page$Main$scrapsAside = function (scraps) {
+	return A2(
+		_elm_lang$html$Html$div,
 		_elm_lang$core$Native_List.fromArray(
 			[
 				A2(_surprisetalk$aiport_annex_page$Main$styleColumn, 10, '#EEE')
 			]),
 		_elm_lang$core$Native_List.fromArray(
 			[
-				A2(
-				_elm_lang$html$Html$ul,
-				_elm_lang$core$Native_List.fromArray(
-					[]),
-				_elm_lang$core$Native_List.fromArray(
-					[
-						A2(
-						_elm_lang$html$Html$li,
-						_elm_lang$core$Native_List.fromArray(
-							[]),
-						_elm_lang$core$Native_List.fromArray(
-							[
-								_elm_lang$html$Html$text(page.name)
-							])),
-						A2(
-						_elm_lang$html$Html$li,
-						_elm_lang$core$Native_List.fromArray(
-							[]),
-						_elm_lang$core$Native_List.fromArray(
-							[
-								_elm_lang$html$Html$text(page.route)
-							]))
-					]))
+				_surprisetalk$aiport_annex_page$Main$scrapsNav(scraps)
 			]));
 };
-var _surprisetalk$aiport_annex_page$Main$Model = F5(
-	function (a, b, c, d, e) {
-		return {pages: a, scraps: b, page: c, pagelet: d, workspace: e};
-	});
-var _surprisetalk$aiport_annex_page$Main$FetchFail = function (a) {
-	return {ctor: 'FetchFail', _0: a};
-};
-var _surprisetalk$aiport_annex_page$Main$FetchScrapSucceed = function (a) {
-	return {ctor: 'FetchScrapSucceed', _0: a};
-};
-var _surprisetalk$aiport_annex_page$Main$fetchScraps = function () {
-	var body = _evancz$elm_http$Http$empty;
-	var url = 'http://taysar.com:9097/scrap/json/taysar';
-	return A3(
-		_elm_lang$core$Task$perform,
-		_surprisetalk$aiport_annex_page$Main$FetchFail,
-		_surprisetalk$aiport_annex_page$Main$FetchScrapSucceed,
-		A3(_evancz$elm_http$Http$post, _surprisetalk$aiport_annex_page$JsonToHtml$parseJson, url, body));
-}();
-var _surprisetalk$aiport_annex_page$Main$update = F2(
-	function (msg, model) {
-		var _p0 = msg;
-		switch (_p0.ctor) {
-			case 'ViewPage':
-				return {
-					ctor: '_Tuple2',
-					_0: _elm_lang$core$Native_Utils.update(
-						model,
-						{page: _p0._0}),
-					_1: _elm_lang$core$Platform_Cmd$none
-				};
-			case 'SelectPagelet':
-				return {
-					ctor: '_Tuple2',
-					_0: _elm_lang$core$Native_Utils.update(
-						model,
-						{pagelet: _p0._0}),
-					_1: _elm_lang$core$Platform_Cmd$none
-				};
-			case 'SelectScrap':
-				return {
-					ctor: '_Tuple2',
-					_0: _elm_lang$core$Native_Utils.update(
-						model,
-						{
-							pagelet: A2(_surprisetalk$aiport_annex_page$Pagelet$setScrap, model.pagelet, _p0._0)
-						}),
-					_1: _elm_lang$core$Platform_Cmd$none
-				};
-			case 'FetchPageSucceed':
-				return {
-					ctor: '_Tuple2',
-					_0: _elm_lang$core$Native_Utils.update(
-						model,
-						{pages: _p0._0}),
-					_1: A2(_elm_lang$core$Debug$log, 'FetchPageSucceed', _surprisetalk$aiport_annex_page$Main$fetchScraps)
-				};
-			case 'FetchScrapSucceed':
-				return {
-					ctor: '_Tuple2',
-					_0: _elm_lang$core$Native_Utils.update(
-						model,
-						{
-							workspace: A2(
-								_elm_lang$html$Html$div,
-								_elm_lang$core$Native_List.fromArray(
-									[
-										A2(_surprisetalk$aiport_annex_page$Main$styleColumn, 50, 'white')
-									]),
-								_p0._0)
-						}),
-					_1: A2(_elm_lang$core$Debug$log, 'FetchScrapSucceed', _elm_lang$core$Platform_Cmd$none)
-				};
-			default:
-				var _p1 = _p0._0;
-				switch (_p1.ctor) {
-					case 'Timeout':
-						return {
-							ctor: '_Tuple2',
-							_0: model,
-							_1: A2(_elm_lang$core$Debug$log, 'timeout', _elm_lang$core$Platform_Cmd$none)
-						};
-					case 'NetworkError':
-						return {
-							ctor: '_Tuple2',
-							_0: model,
-							_1: A2(_elm_lang$core$Debug$log, 'network error', _elm_lang$core$Platform_Cmd$none)
-						};
-					case 'UnexpectedPayload':
-						return {
-							ctor: '_Tuple2',
-							_0: model,
-							_1: A2(_elm_lang$core$Debug$log, _p1._0, _elm_lang$core$Platform_Cmd$none)
-						};
-					default:
-						return {
-							ctor: '_Tuple2',
-							_0: model,
-							_1: A2(
-								_elm_lang$core$Debug$log,
-								A2(
-									_elm_lang$core$Basics_ops['++'],
-									_p1._1,
-									_elm_lang$core$Basics$toString(_p1._0)),
-								_elm_lang$core$Platform_Cmd$none)
-						};
-				}
-		}
-	});
-var _surprisetalk$aiport_annex_page$Main$FetchPageSucceed = function (a) {
-	return {ctor: 'FetchPageSucceed', _0: a};
-};
-var _surprisetalk$aiport_annex_page$Main$fetchPages = function () {
-	var url = 'http://taysar.com:9097/pile/page';
-	return A3(
-		_elm_lang$core$Task$perform,
-		_surprisetalk$aiport_annex_page$Main$FetchFail,
-		_surprisetalk$aiport_annex_page$Main$FetchPageSucceed,
-		A2(_evancz$elm_http$Http$get, _surprisetalk$aiport_annex_page$JsonToPage$parseJson, url));
-}();
-var _surprisetalk$aiport_annex_page$Main$init = {
-	ctor: '_Tuple2',
-	_0: {
-		pages: _surprisetalk$aiport_annex_page$Page$testPages,
-		page: A2(
-			_surprisetalk$aiport_annex_page$Main_ops['?'],
-			_elm_lang$core$List$head(_surprisetalk$aiport_annex_page$Page$testPages),
-			_surprisetalk$aiport_annex_page$Page$emptyPage),
-		pagelet: _surprisetalk$aiport_annex_page$Pagelet$emptyPagelet,
-		scraps: _surprisetalk$aiport_annex_page$Scrap$testScraps,
-		workspace: A2(
-			_elm_lang$html$Html$div,
-			_elm_lang$core$Native_List.fromArray(
-				[
-					A2(_surprisetalk$aiport_annex_page$Main$styleColumn, 50, 'white')
-				]),
-			_elm_lang$core$Native_List.fromArray(
-				[]))
-	},
-	_1: _surprisetalk$aiport_annex_page$Main$fetchPages
-};
-var _surprisetalk$aiport_annex_page$Main$SelectScrap = function (a) {
-	return {ctor: 'SelectScrap', _0: a};
-};
-var _surprisetalk$aiport_annex_page$Main$scrapLink = function (scrap) {
+var _surprisetalk$aiport_annex_page$Main$pageDetails = function (page) {
 	return A2(
-		_elm_lang$html$Html$li,
+		_elm_lang$html$Html$div,
 		_elm_lang$core$Native_List.fromArray(
-			[]),
+			[
+				A2(_surprisetalk$aiport_annex_page$Main$styleColumn, 25, '#ECECEC')
+			]),
 		_elm_lang$core$Native_List.fromArray(
 			[
 				A2(
-				_elm_lang$html$Html$a,
+				_elm_lang$html$Html$label,
 				_elm_lang$core$Native_List.fromArray(
 					[
-						_elm_lang$html$Html_Events$onClick(
-						_surprisetalk$aiport_annex_page$Main$SelectScrap(scrap)),
-						_elm_lang$html$Html_Attributes$href('#')
+						_elm_lang$html$Html_Attributes$style(
+						_elm_lang$core$Native_List.fromArray(
+							[
+								A2(_surprisetalk$aiport_annex_page$Main_ops['=>'], 'display', 'block ')
+							]))
 					]),
 				_elm_lang$core$Native_List.fromArray(
 					[
-						_elm_lang$html$Html$text(scrap.name)
+						_elm_lang$html$Html$text('name'),
+						A2(
+						_elm_lang$html$Html$input,
+						_elm_lang$core$Native_List.fromArray(
+							[
+								_elm_lang$html$Html_Attributes$value(page.name)
+							]),
+						_elm_lang$core$Native_List.fromArray(
+							[]))
+					])),
+				A2(
+				_elm_lang$html$Html$label,
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html_Attributes$style(
+						_elm_lang$core$Native_List.fromArray(
+							[
+								A2(_surprisetalk$aiport_annex_page$Main_ops['=>'], 'display', 'block ')
+							]))
+					]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html$text('route'),
+						A2(
+						_elm_lang$html$Html$input,
+						_elm_lang$core$Native_List.fromArray(
+							[
+								_elm_lang$html$Html_Attributes$value(page.route)
+							]),
+						_elm_lang$core$Native_List.fromArray(
+							[]))
 					]))
 			]));
 };
-var _surprisetalk$aiport_annex_page$Main$scrapsNav = function (scraps) {
-	return A2(
-		_elm_lang$html$Html$ul,
-		_elm_lang$core$Native_List.fromArray(
-			[]),
-		A2(_elm_lang$core$List$map, _surprisetalk$aiport_annex_page$Main$scrapLink, scraps));
-};
-var _surprisetalk$aiport_annex_page$Main$pageletDetails = F2(
-	function (pagelet, scraps) {
+var _surprisetalk$aiport_annex_page$Main$workspaceGroup = function (workspace) {
+	var _p3 = workspace.page;
+	if (_p3.ctor === 'Nothing') {
 		return A2(
-			_elm_lang$html$Html$aside,
+			_elm_lang$html$Html$div,
 			_elm_lang$core$Native_List.fromArray(
 				[
-					A2(_surprisetalk$aiport_annex_page$Main$styleColumn, 25, '#EEE')
+					A2(_surprisetalk$aiport_annex_page$Main$styleColumn, 80, 'white')
+				]),
+			_elm_lang$core$Native_List.fromArray(
+				[]));
+	} else {
+		var _p4 = _p3._0;
+		return A2(
+			_elm_lang$html$Html$div,
+			_elm_lang$core$Native_List.fromArray(
+				[
+					A2(_surprisetalk$aiport_annex_page$Main$styleColumn, 80, 'white')
 				]),
 			_elm_lang$core$Native_List.fromArray(
 				[
-					A2(
-					_elm_lang$html$Html$h2,
-					_elm_lang$core$Native_List.fromArray(
-						[]),
-					_elm_lang$core$Native_List.fromArray(
-						[
-							_elm_lang$html$Html$text(
-							function (_) {
-								return _.name;
-							}(
-								function (_) {
-									return _.scrap;
-								}(
-									_surprisetalk$aiport_annex_page$Tree$pick(pagelet))))
-						])),
-					_elm_lang$core$String$isEmpty(
-					function (_) {
-						return _.name;
-					}(
-						function (_) {
-							return _.scrap;
-						}(
-							_surprisetalk$aiport_annex_page$Tree$pick(pagelet)))) ? A2(
-					_elm_lang$html$Html$ul,
-					_elm_lang$core$Native_List.fromArray(
-						[]),
-					_elm_lang$core$Native_List.fromArray(
-						[])) : _surprisetalk$aiport_annex_page$Main$scrapsNav(scraps)
+					_surprisetalk$aiport_annex_page$Main$pageDetails(_p4),
+					_surprisetalk$aiport_annex_page$Main$pageletDetails(workspace.pagelet),
+					_surprisetalk$aiport_annex_page$Main$workspaceDetails(_p4)
 				]));
+	}
+};
+var _surprisetalk$aiport_annex_page$Main$Model = F3(
+	function (a, b, c) {
+		return {pages: a, scraps: b, workspace: c};
 	});
+var _surprisetalk$aiport_annex_page$Main$Workspace = F4(
+	function (a, b, c, d) {
+		return {hoverscrap: a, overpagelets: b, page: c, pagelet: d};
+	});
+var _surprisetalk$aiport_annex_page$Main$UpdatePageRoute = function (a) {
+	return {ctor: 'UpdatePageRoute', _0: a};
+};
+var _surprisetalk$aiport_annex_page$Main$UpdatePageName = function (a) {
+	return {ctor: 'UpdatePageName', _0: a};
+};
+var _surprisetalk$aiport_annex_page$Main$UpdatePage = function (a) {
+	return {ctor: 'UpdatePage', _0: a};
+};
 var _surprisetalk$aiport_annex_page$Main$SelectPagelet = function (a) {
 	return {ctor: 'SelectPagelet', _0: a};
 };
-var _surprisetalk$aiport_annex_page$Main$pageletBuild = F2(
-	function (the_pagelet, a_pagelet) {
-		return A2(
-			_elm_lang$html$Html$section,
-			_elm_lang$core$Native_List.fromArray(
-				[
-					_elm_lang$html$Html_Events$onClick(
-					_surprisetalk$aiport_annex_page$Main$SelectPagelet(a_pagelet)),
-					_elm_lang$html$Html_Attributes$style(
-					_elm_lang$core$Native_List.fromArray(
-						[
-							A2(
-							_surprisetalk$aiport_annex_page$Main_ops['=>'],
-							'background-color',
-							_elm_lang$core$Native_Utils.eq(a_pagelet, the_pagelet) ? '#EEE' : 'white')
-						]))
-				]),
-			_elm_lang$core$Native_List.fromArray(
-				[
-					_surprisetalk$aiport_annex_page$Main$render(a_pagelet)
-				]));
-	});
-var _surprisetalk$aiport_annex_page$Main$pageBuild = F2(
-	function (the_pagelet, pagelets) {
-		return A2(
-			_elm_lang$html$Html$article,
-			_elm_lang$core$Native_List.fromArray(
-				[
-					A2(_surprisetalk$aiport_annex_page$Main$styleColumn, 50, 'white')
-				]),
-			A2(
-				_elm_lang$core$List$map,
-				_surprisetalk$aiport_annex_page$Main$pageletBuild(the_pagelet),
-				pagelets));
-	});
-var _surprisetalk$aiport_annex_page$Main$ViewPage = function (a) {
-	return {ctor: 'ViewPage', _0: a};
+var _surprisetalk$aiport_annex_page$Main$SelectPage = function (a) {
+	return {ctor: 'SelectPage', _0: a};
 };
 var _surprisetalk$aiport_annex_page$Main$pageLink = function (page) {
 	return A2(
@@ -9413,9 +10074,9 @@ var _surprisetalk$aiport_annex_page$Main$pageLink = function (page) {
 				_elm_lang$html$Html$a,
 				_elm_lang$core$Native_List.fromArray(
 					[
+						_elm_lang$html$Html_Attributes$href('#'),
 						_elm_lang$html$Html_Events$onClick(
-						_surprisetalk$aiport_annex_page$Main$ViewPage(page)),
-						_elm_lang$html$Html_Attributes$href('#')
+						_surprisetalk$aiport_annex_page$Main$SelectPage(page))
 					]),
 				_elm_lang$core$Native_List.fromArray(
 					[
@@ -9423,20 +10084,23 @@ var _surprisetalk$aiport_annex_page$Main$pageLink = function (page) {
 					]))
 			]));
 };
-var _surprisetalk$aiport_annex_page$Main$pageNav = function (pages) {
+var _surprisetalk$aiport_annex_page$Main$pagesNav = function (pages) {
+	return A2(
+		_elm_lang$html$Html$ul,
+		_elm_lang$core$Native_List.fromArray(
+			[]),
+		A2(_elm_lang$core$List$map, _surprisetalk$aiport_annex_page$Main$pageLink, pages));
+};
+var _surprisetalk$aiport_annex_page$Main$pagesAside = function (pages) {
 	return A2(
 		_elm_lang$html$Html$aside,
 		_elm_lang$core$Native_List.fromArray(
 			[
-				A2(_surprisetalk$aiport_annex_page$Main$styleColumn, 15, '#E8E8E8')
+				A2(_surprisetalk$aiport_annex_page$Main$styleColumn, 10, '#E8E8E8')
 			]),
 		_elm_lang$core$Native_List.fromArray(
 			[
-				A2(
-				_elm_lang$html$Html$ul,
-				_elm_lang$core$Native_List.fromArray(
-					[]),
-				A2(_elm_lang$core$List$map, _surprisetalk$aiport_annex_page$Main$pageLink, pages))
+				_surprisetalk$aiport_annex_page$Main$pagesNav(pages)
 			]));
 };
 var _surprisetalk$aiport_annex_page$Main$view = function (model) {
@@ -9452,10 +10116,47 @@ var _surprisetalk$aiport_annex_page$Main$view = function (model) {
 			]),
 		_elm_lang$core$Native_List.fromArray(
 			[
-				_surprisetalk$aiport_annex_page$Main$pageNav(model.pages),
-				_surprisetalk$aiport_annex_page$Main$pageDetails(model.page),
-				model.workspace,
-				A2(_surprisetalk$aiport_annex_page$Main$pageletDetails, model.pagelet, model.scraps)
+				_surprisetalk$aiport_annex_page$Main$pagesAside(model.pages),
+				_surprisetalk$aiport_annex_page$Main$workspaceGroup(model.workspace),
+				_surprisetalk$aiport_annex_page$Main$scrapsAside(model.scraps)
+			]));
+};
+var _surprisetalk$aiport_annex_page$Main$LoadScraps = function (a) {
+	return {ctor: 'LoadScraps', _0: a};
+};
+var _surprisetalk$aiport_annex_page$Main$LoadPages = function (a) {
+	return {ctor: 'LoadPages', _0: a};
+};
+var _surprisetalk$aiport_annex_page$Main$subscriptions = function (model) {
+	return _elm_lang$core$Platform_Sub$batch(
+		_elm_lang$core$Native_List.fromArray(
+			[
+				A2(
+				_elm_lang$websocket$WebSocket$listen,
+				'ws://taysar.com:9097/pile/page',
+				function (_p5) {
+					return _surprisetalk$aiport_annex_page$Main$LoadPages(
+						A2(
+							_elm_lang$core$Result$withDefault,
+							model.pages,
+							A2(
+								_elm_lang$core$Json_Decode$decodeString,
+								_elm_lang$core$Json_Decode$list(_surprisetalk$aiport_annex_page$JsonToPage$parseJson),
+								_p5)));
+				}),
+				A2(
+				_elm_lang$websocket$WebSocket$listen,
+				'ws://taysar.com:9097/pile/scrap',
+				function (_p6) {
+					return _surprisetalk$aiport_annex_page$Main$LoadScraps(
+						A2(
+							_elm_lang$core$Result$withDefault,
+							model.scraps,
+							A2(
+								_elm_lang$core$Json_Decode$decodeString,
+								_elm_lang$core$Json_Decode$list(_surprisetalk$aiport_annex_page$JsonToScrap$parseJson),
+								_p6)));
+				})
 			]));
 };
 var _surprisetalk$aiport_annex_page$Main$main = {
